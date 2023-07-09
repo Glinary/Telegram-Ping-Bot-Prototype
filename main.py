@@ -29,6 +29,7 @@ from telegram.constants import ParseMode
 import re
 
 from telegram import Bot
+from telegram.error import BadRequest
 
 # ---------- IMPORT TELEGRAM API ---------- #
 
@@ -331,16 +332,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # --- delete for mention ids feature --- #
 
     if ("@" in text):
-        user_ids = []
+        usernames = []
         tags = extract_words_with_at_symbol(text)
 
         for tag in tags:
-            user_ids.extend(db.get_tag_usernames(tag))
+            usernames.extend(db.get_tag_usernames(tag))
         db.close_connection()
 
-        temp = ' '.join(user_ids)
+        temp = ' '.join(usernames)
 
-        await update.message.reply_text(temp)
+        #user_ids = get_user_ids(usernames, update.message.chat.id)
+
+        await update.message.reply_text(usernames)
 
 
     # --- delete for mention ids feature --- #
@@ -403,6 +406,23 @@ def get_count(text, num) -> str:
         reply: str = "[T" + str(num) + "] -" + str(text_len - 280)
 
     return reply
+
+# TODO: Bot object has no attribute get_chat_members
+def get_user_ids(usernames, chat_id):
+    bot = Bot(token = TOKEN)
+    user_ids = []
+
+    for username in usernames:
+        try:
+            members = bot.get_chat_members(chat_id=chat_id)
+            for member in members:
+                if member.user.username == username:
+                    user_ids.append(member.user.id)
+                    break
+        except BadRequest as e:
+            print(f"Failed to get members: {str(e)}")
+
+    return user_ids
 
 # ---------- ASSISTING FUNCTIONS IN CODE OF COMMANDS ---------- #
 
