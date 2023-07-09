@@ -134,6 +134,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Store the user ID and username in the database
     db.store_user_id(user_id, username)
+    db.close_connection()
 
     await update.message.reply_text(f"Welcome, {user.username}! Glee says hi")
 
@@ -207,10 +208,11 @@ async def mention_ids_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     for tag in tags:
         tag_usernames = db.get_tag_usernames(tag)
         usernames.extend(tag_usernames)
-    db.close_connection
+    db.close_connection()
 
     for username in usernames:
         user_ids.extend(db.get_user_id(username))
+    db.close_connection()
 
     # Generate mention tags for each user ID
     mention_tags = [f'<a href="tg://user?id={user_id}">.</a>' for user_id in user_ids]
@@ -267,6 +269,7 @@ if __name__ == '__main__':
     # CREATES THE DATABASE
     db = None
     create_db_instance()
+    db.close_connection
 
     # COMMANDS
     app.add_handler(CommandHandler('start', start_command))
