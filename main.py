@@ -191,6 +191,7 @@ async def view_tags_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tags_text = ' '.join(tags)
     await update.message.reply_text(tags_text)
 
+# shows the usernames connected in a tag
 async def view_tag_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text: str = update.message.text
@@ -240,34 +241,45 @@ async def view_database_command(update: Update, context: ContextTypes.DEFAULT_TY
     Database printed successfully. Note that only devs have access to the console.
     """)
 
-async def mention_ids_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ---------- CODE OF COMMANDS ---------- #
 
+# ---------- MESSAGE HANDLER ---------- #
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    #check whether user is in group chat or private chat
+    message_type: str = update.message.chat.type
     text: str = update.message.text
-    processed_text: str = text
 
-    usernames = []
-    user_ids = []
+    print(f'User ({update.message.chat.id}) in {message_type}: "text"')
 
-    if ('@' in processed_text):
+    #NOTE: if commented, bot does not have to be mentioned to work in a group
+    '''
+    if (message_type == 'group'):
+        if BOT_USERNAME in text:
+            new_text: str = text.replace(BOT_USERNAME, '').strip()
+            response: str = handle_response(new_text)
+        else:
+            return
+    else:
+    '''
+    if ("@" in text):
+        user_ids = []
         tags = extract_words_with_at_symbol(text)
 
-    for tag in tags:
-        user_ids.extend(db.get_tag_ids(tag))
-    db.close_connection()
+        for tag in tags:
+            user_ids.extend(db.get_tag_ids(tag))
+        db.close_connection()
 
-    # Generate mention tags for each user ID
-    mention_tags = [f'<a href="tg://user?id={user_id}">.</a>' for user_id in user_ids]
-    mention_message = ''.join(mention_tags)
-    await update.effective_chat.send_message(
-        text = mention_message,
-        parse_mode = ParseMode.HTML
-    )
+        # Generate mention tags for each user ID
+        mention_tags = [f'<a href="tg://user?id={user_id}">.</a>' for user_id in user_ids]
+        mention_message = ''.join(mention_tags)
+        await update.effective_chat.send_message(
+            text = mention_message,
+            parse_mode = ParseMode.HTML
+        )
+        
 
-#TODO: store in tag table user ids instead
-
-#TODO: make handle message detect any incoming @ instead of mention_ids_command
-
-# ---------- CODE OF COMMANDS ---------- #
+# ---------- MESSAGE HANDLER ---------- #
 
 # ---------- DEBUGGER ---------- #
 async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -283,24 +295,12 @@ def create_db_instance():
     if db is None:
         db = Database()
 
+# returns a list of words with an @ symbol
 def extract_words_with_at_symbol(text):
     pattern = r'@\w+'
     words = re.findall(pattern, text)
 
     return words
-
-async def get_chat_id(chat_username):
-    try:
-        # Use the get_chat method to retrieve information about the chat
-        chat = await bot.get_chat(chat_id=chat_username)
-        
-        # Extract the chat ID from the retrieved chat information
-        chat_id = chat.id
-        return chat_id
-    except Exception as e:
-        print(f"Error retrieving chat ID for chat '{chat_username}': {e}")
-        return None
-
 
 # ---------- ASSISTING FUNCTIONS IN CODE OF COMMANDS ---------- #
 
@@ -317,8 +317,10 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('viewtags', view_tags_command))
     app.add_handler(CommandHandler('viewtagusernames', view_tag_usernames))
     app.add_handler(CommandHandler('viewdatabase', view_database_command))
-    app.add_handler(CommandHandler('mentionids', mention_ids_command))
 
+    #Messages
+    app.add_handler(MessageHandler(filters.TEXT, handle_message))
+    
     # ERRORS
     app.add_error_handler(error)
 
