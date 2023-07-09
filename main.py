@@ -339,11 +339,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             usernames.extend(db.get_tag_usernames(tag))
         db.close_connection()
 
-        temp = ' '.join(usernames)
+        usernames_processed = ' '.join(usernames)
 
         #user_ids = get_user_ids(usernames, update.message.chat.id)
 
-        await update.message.reply_text(usernames)
+        await update.message.reply_text(usernames_processed)
 
 
     # --- delete for mention ids feature --- #
