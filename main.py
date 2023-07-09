@@ -15,9 +15,8 @@ import os
 load_dotenv()
 
 # Load the hidden environment variables
-TOKEN: Final = os.getenv("BOT_TOKEN")
+TOKEN: Final = os.getenv("TOKEN")
 BOT_USERNAME: Final = os.getenv("BOT_USERNAME")
-SHEET_ID: Final = os.getenv("SHEET_ID")
 
 # ---------- SECURE API TOKEN ---------- #
 
@@ -44,6 +43,27 @@ class Database:
         self.connection = sqlite3.connect('username_data.db')
         self.cursor = self.connection.cursor()
 
+    # --- delete this section for mention ids feature --- #
+        self.cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tag (
+            tag_name TEXT,
+            username TEXT
+        )
+        """)
+
+        self.cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ids (
+            user_id TEXT PRIMARY KEY,
+            username TEXT
+        )
+        """)
+        self.connection.commit()
+
+    # --- delete this section for mention ids feature --- #
+
+
+    # uncomment for mention ids feature
+    '''
         self.cursor.execute("""
         CREATE TABLE IF NOT EXISTS tag (
             tag_name TEXT,
@@ -59,6 +79,7 @@ class Database:
         )
         """)
         self.connection.commit()
+    '''
 
     # store user id
     def store_user_id(self, user_id, username):
@@ -112,6 +133,8 @@ class Database:
         """.format(tag_name))
         self.connection.commit()
 
+        # uncomment for mention ids feature
+        '''
         for username in usernames:
             temp = self.get_user_id(username)
             user_id = temp[0]
@@ -120,6 +143,16 @@ class Database:
             ('{}', '{}', '{}')
             """.format(tag_name, username, user_id))
         self.connection.commit()
+        '''
+
+        # --- delete for mention ids feature --- #
+        for username in usernames:
+            self.cursor.execute("""
+            INSERT OR IGNORE INTO tag VALUES
+            ('{}', '{}')
+            """.format(tag_name, username))
+        self.connection.commit()
+        # --- delete for mention ids feature --- #
 
     # returns the usernames connected in a tag
     def get_tag_usernames(self, tag_name):
@@ -259,7 +292,7 @@ async def count_char_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 # ---------- MESSAGE HANDLER ---------- #
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     #check whether user is in group chat or private chat
     message_type: str = update.message.chat.type
     text: str = update.message.text
@@ -276,6 +309,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             return
     else:
     '''
+
+    # uncomment for mention ids feature
+    '''
     if ("@" in text):
         user_ids = []
         tags = extract_words_with_at_symbol(text)
@@ -291,6 +327,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             text = mention_message,
             parse_mode = ParseMode.HTML
         )
+    '''
+    # --- delete for mention ids feature --- #
+
+    if ("@" in text):
+        user_ids = []
+        tags = extract_words_with_at_symbol(text)
+
+        for tag in tags:
+            user_ids.extend(db.get_tag_usernames(tag))
+        db.close_connection()
+
+        temp = ' '.join(user_ids)
+
+        await update.message.reply_text(temp)
+
+
+    # --- delete for mention ids feature --- #
         
 
 # ---------- MESSAGE HANDLER ---------- #
