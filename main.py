@@ -1,3 +1,5 @@
+#TODO: make tag database different for each group chat
+
 # ---------- INSTALLATION REQUIREMENTS ---------- #
 '''
     pip install python-dotenv
@@ -241,6 +243,18 @@ async def view_database_command(update: Update, context: ContextTypes.DEFAULT_TY
     Database printed successfully. Note that only devs have access to the console.
     """)
 
+# show count for tweet posts by paragraph
+async def count_char_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text: str = update.message.text
+    reply: str = ""
+
+    paragraphs = text.split("\n\n")
+
+    for i in range(0, len(paragraphs), 1):
+        reply += get_count(paragraphs[i], i+1) + " \n"
+    
+    await update.message.reply_text(reply)
+
 # ---------- CODE OF COMMANDS ---------- #
 
 # ---------- MESSAGE HANDLER ---------- #
@@ -302,6 +316,41 @@ def extract_words_with_at_symbol(text):
 
     return words
 
+# returns count of characters for tweet post and detects links
+def get_count(text, num) -> str:
+    text_len = len(text)
+
+    if (text == ('/countchar' + BOT_USERNAME)):
+        return "readme"
+    elif (text == ('/countchar')):
+        return "bhie wala namang tweet"
+
+    print('/countchar' + BOT_USERNAME)
+    link_pattern = r'\b((?:https?://)?(?:(?:www\.)?(?:[\da-z\.-]+)\.(?:[a-z]{2,6})|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|(?:(?:[0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:(?:(?::[0-9a-fA-F]{1,4}){1,6})|:(?:(?::[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(?::[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(?:ffff(?::0{1,4}){0,1}:){0,1}(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])|(?:[0-9a-fA-F]{1,4}:){1,4}:(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])))(?::[0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])?(?:/[\w\.-]*)*/?)\b'
+
+    # Replace links with a fixed-length placeholder
+    def replace_links(match):
+        return "*" * (23)
+
+    text_no_links = re.sub(link_pattern, replace_links, text)
+
+    # Count the remaining characters (over 9 lagi yung links sa regex, tamad na ko ayusin sori ms nats)
+    character_count = len(text_no_links)
+
+    text_len = character_count
+
+    if ('/countchar' + BOT_USERNAME) in text:
+        text_len -= (len('/countchar' + BOT_USERNAME) + 1)
+    elif "/countchar" in text:
+        text_len -= (len('/countchar') + 1)
+
+    if (text_len <= 280):
+        reply: str = "[T" + str(num) + "] " + str(text_len)
+    else:
+        reply: str = "[T" + str(num) + "] -" + str(text_len - 280)
+
+    return reply
+
 # ---------- ASSISTING FUNCTIONS IN CODE OF COMMANDS ---------- #
 
 if __name__ == '__main__':
@@ -317,6 +366,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('viewtags', view_tags_command))
     app.add_handler(CommandHandler('viewtagusernames', view_tag_usernames))
     app.add_handler(CommandHandler('viewdatabase', view_database_command))
+    app.add_handler(CommandHandler('countchar', count_char_command))
 
     #Messages
     app.add_handler(MessageHandler(filters.TEXT, handle_message))
