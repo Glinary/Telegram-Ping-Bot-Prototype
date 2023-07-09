@@ -45,7 +45,8 @@ class Database:
         self.cursor.execute("""
         CREATE TABLE IF NOT EXISTS tag (
             tag_name TEXT,
-            username TEXT
+            username TEXT,
+            user_id TEXT
         )
         """)
 
@@ -59,6 +60,8 @@ class Database:
 
     # store user id
     def store_user_id(self, user_id, username):
+        self.connection = sqlite3.connect('username_data.db')
+        self.cursor = self.connection.cursor()
         self.cursor.execute("""
         DELETE FROM ids
         WHERE username = '{}'
@@ -72,7 +75,10 @@ class Database:
         self.connection.commit()
 
     # get user id given username
+    # IMPORTANT! get_user_id returns a list, so you may want to use index[0]
     def get_user_id(self, username):
+        self.connection = sqlite3.connect('username_data.db')
+        self.cursor = self.connection.cursor()
         self.cursor.execute("""
         SELECT user_id
         FROM ids
@@ -81,8 +87,23 @@ class Database:
         temp = self.cursor.fetchone()
         return temp
 
-    # modifies the tags with usernames
+    # returns connected ids in a tag
+    def get_tag_ids(self, tag_name):
+        self.connection = sqlite3.connect('username_data.db')
+        self.cursor = self.connection.cursor()
+        self.cursor.execute("""
+        SELECT user_id
+        FROM tag
+        WHERE tag_name = '{}'
+        """.format(tag_name))
+        tag_ids = [row[0] for row in self.cursor.fetchall()]
+        return tag_ids
+
+    # modifies the tags with usernames but stores their id
+    # IMPORTANT! user must /start the bot first because it needs their id
     def setup_tag(self, tag_name, usernames):
+        self.connection = sqlite3.connect('username_data.db')
+        self.cursor = self.connection.cursor()
         self.cursor.execute("""
         DELETE FROM tag
         WHERE tag_name = '{}'
@@ -90,14 +111,18 @@ class Database:
         self.connection.commit()
 
         for username in usernames:
+            temp = self.get_user_id(username)
+            user_id = temp[0]
             self.cursor.execute("""
             INSERT OR IGNORE INTO tag VALUES
-            ('{}', '{}')
-            """.format(tag_name, username))
+            ('{}', '{}', '{}')
+            """.format(tag_name, username, user_id))
         self.connection.commit()
 
     # returns the usernames connected in a tag
     def get_tag_usernames(self, tag_name):
+        self.connection = sqlite3.connect('username_data.db')
+        self.cursor = self.connection.cursor()
         self.cursor.execute("""
         SELECT username 
         FROM tag
@@ -108,6 +133,8 @@ class Database:
 
     # returns the database of tags in the chat
     def view_tags(self):
+        self.connection = sqlite3.connect('username_data.db')
+        self.cursor = self.connection.cursor()
         self.cursor.execute("""
         SELECT DISTINCT tag_name
         FROM tag
@@ -141,7 +168,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # modifies the tag with usernames
 async def setup_tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    processed_text: str = update.message.text
+    text = update.message.text
+    processed_text: str = text
 
     if ('@' in processed_text):
         tags = extract_words_with_at_symbol(text)
@@ -150,18 +178,34 @@ async def setup_tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     usernames = tags[1:]
 
     db.setup_tag(tag_name, usernames)
-    db.close_connection
+    db.close_connection()
 
     await update.message.reply_text("tags updated")
 
 # shows the current tags in the chat
 async def view_tags_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    
+
     tags = db.view_tags()
-    db.close_connection
+    db.close_connection()
 
     tags_text = ' '.join(tags)
     await update.message.reply_text(tags_text)
+
+async def view_tag_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    text: str = update.message.text
+    processed_text: str = text
+    tag_usernames = []
+
+    if ('@' in processed_text):
+        tags = extract_words_with_at_symbol(text)
+
+    for tag in tags:
+        tag_usernames.extend(db.get_tag_usernames(tag))
+    db.close_connection()
+
+    tag_usernames_processed = ' '.join(tag_usernames)
+    await update.message.reply_text(tag_usernames_processed)
 
 # shows database to users
 async def view_database_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -198,7 +242,9 @@ async def view_database_command(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def mention_ids_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    processed_text: str = update.message.text
+    text: str = update.message.text
+    processed_text: str = text
+
     usernames = []
     user_ids = []
 
@@ -206,12 +252,7 @@ async def mention_ids_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         tags = extract_words_with_at_symbol(text)
 
     for tag in tags:
-        tag_usernames = db.get_tag_usernames(tag)
-        usernames.extend(tag_usernames)
-    db.close_connection()
-
-    for username in usernames:
-        user_ids.extend(db.get_user_id(username))
+        user_ids.extend(db.get_tag_ids(tag))
     db.close_connection()
 
     # Generate mention tags for each user ID
@@ -269,12 +310,12 @@ if __name__ == '__main__':
     # CREATES THE DATABASE
     db = None
     create_db_instance()
-    db.close_connection
 
     # COMMANDS
     app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('setuptag', setup_tag_command))
     app.add_handler(CommandHandler('viewtags', view_tags_command))
+    app.add_handler(CommandHandler('viewtagusernames', view_tag_usernames))
     app.add_handler(CommandHandler('viewdatabase', view_database_command))
     app.add_handler(CommandHandler('mentionids', mention_ids_command))
 
