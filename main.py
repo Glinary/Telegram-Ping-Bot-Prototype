@@ -191,6 +191,7 @@ class Database:
 # starts the bot with a welcoming message
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    '''
     user = update.effective_user
     user_id = user.id
     username = user.username
@@ -198,8 +199,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Store the user ID and username in the database
     db.store_user_id(user_id, username)
     db.close_connection()
+    '''
 
-    await update.message.reply_text(f"Welcome, {user.username}! Glee says hi")
+    reply = update.message.reply_to_message.text
+
+    await update.message.reply_text(f"I read: {reply}")
 
 # modifies the tag with usernames
 async def setup_tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -279,13 +283,17 @@ async def view_database_command(update: Update, context: ContextTypes.DEFAULT_TY
 
 # show count for tweet posts by paragraph
 async def count_char_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text: str = update.message.text
-    reply: str = ""
 
-    paragraphs = text.split("\n\n")
+    if update.message.reply_to_message:
+        text: str = update.message.reply_to_message.text
+        reply: str = ""
 
-    for i in range(0, len(paragraphs), 1):
-        reply += get_count(paragraphs[i], i+1) + " \n"
+        paragraphs = text.split("\n\n")
+
+        for i in range(0, len(paragraphs), 1):
+            reply += get_count(paragraphs[i], i+1) + " \n"
+    else:
+        reply = "bhie wala namang tweet"
     
     await update.message.reply_text(reply)
 
@@ -376,12 +384,6 @@ def extract_words_with_at_symbol(text):
 def get_count(text, num) -> str:
     text_len = len(text)
 
-    if (text == ('/countchar' + BOT_USERNAME)):
-        return "readme"
-    elif (text == ('/countchar')):
-        return "bhie wala namang tweet"
-
-    print('/countchar' + BOT_USERNAME)
     link_pattern = r'\b((?:https?://)?(?:(?:www\.)?(?:[\da-z\.-]+)\.(?:[a-z]{2,6})|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|(?:(?:[0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:(?:(?::[0-9a-fA-F]{1,4}){1,6})|:(?:(?::[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(?::[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(?:ffff(?::0{1,4}){0,1}:){0,1}(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])|(?:[0-9a-fA-F]{1,4}:){1,4}:(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])))(?::[0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])?(?:/[\w\.-]*)*/?)\b'
 
     # Replace links with a fixed-length placeholder
@@ -395,10 +397,6 @@ def get_count(text, num) -> str:
 
     text_len = character_count
 
-    if ('/countchar' + BOT_USERNAME) in text:
-        text_len -= (len('/countchar' + BOT_USERNAME) + 1)
-    elif "/countchar" in text:
-        text_len -= (len('/countchar') + 1)
 
     if (text_len <= 280):
         reply: str = "[T" + str(num) + "] " + str(text_len)
