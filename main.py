@@ -392,7 +392,7 @@ def get_count(text, num) -> str:
 
     text_no_links = re.sub(link_pattern, replace_links, text)
 
-    # Count the remaining characters (over 9 lagi yung links sa regex, tamad na ko ayusin sori ms nats)
+    # Count the remaining characters 
     character_count = len(text_no_links)
 
     text_len = character_count
