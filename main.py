@@ -18,6 +18,7 @@ load_dotenv()
 TOKEN: Final = os.getenv("TOKEN")
 BOT_USERNAME: Final = os.getenv("BOT_USERNAME")
 
+
 # ---------- SECURE API TOKEN ---------- #
 
 # ---------- IMPORT TELEGRAM API ---------- #
@@ -40,8 +41,9 @@ import sqlite3
 class Database:
     
     # creates and connects the local database
-    def __init__(self):
-        self.connection = sqlite3.connect('username_data.db')
+    def __init__(self, chat_id):
+        self.chat_id = chat_id
+        self.connection = sqlite3.connect(f'username_data_{self.chat_id}.db')
         self.cursor = self.connection.cursor()
 
     # --- delete this section for mention ids feature --- #
@@ -84,7 +86,7 @@ class Database:
 
     # store user id
     def store_user_id(self, user_id, username):
-        self.connection = sqlite3.connect('username_data.db')
+        self.connection = sqlite3.connect(f'username_data_{self.chat_id}.db')
         self.cursor = self.connection.cursor()
         self.cursor.execute("""
         DELETE FROM ids
@@ -101,7 +103,7 @@ class Database:
     # get user id given username
     # IMPORTANT! get_user_id returns a list, so you may want to use index[0]
     def get_user_id(self, username):
-        self.connection = sqlite3.connect('username_data.db')
+        self.connection = sqlite3.connect(f'username_data_{self.chat_id}.db')
         self.cursor = self.connection.cursor()
         self.cursor.execute("""
         SELECT user_id
@@ -113,7 +115,7 @@ class Database:
 
     # returns connected ids in a tag
     def get_tag_ids(self, tag_name):
-        self.connection = sqlite3.connect('username_data.db')
+        self.connection = sqlite3.connect(f'username_data_{self.chat_id}.db')
         self.cursor = self.connection.cursor()
         self.cursor.execute("""
         SELECT user_id
@@ -126,7 +128,7 @@ class Database:
     # modifies the tags with usernames but stores their id
     # IMPORTANT! user must /start the bot first because it needs their id
     def setup_tag(self, tag_name, usernames):
-        self.connection = sqlite3.connect('username_data.db')
+        self.connection = sqlite3.connect(f'username_data_{self.chat_id}.db')
         self.cursor = self.connection.cursor()
         self.cursor.execute("""
         DELETE FROM tag
@@ -157,7 +159,7 @@ class Database:
 
     # returns the usernames connected in a tag
     def get_tag_usernames(self, tag_name):
-        self.connection = sqlite3.connect('username_data.db')
+        self.connection = sqlite3.connect(f'username_data_{self.chat_id}.db')
         self.cursor = self.connection.cursor()
         self.cursor.execute("""
         SELECT username 
@@ -169,7 +171,7 @@ class Database:
 
     # returns the database of tags in the chat
     def view_tags(self):
-        self.connection = sqlite3.connect('username_data.db')
+        self.connection = sqlite3.connect(f'username_data_{self.chat_id}.db')
         self.cursor = self.connection.cursor()
         self.cursor.execute("""
         SELECT DISTINCT tag_name
@@ -201,9 +203,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.close_connection()
     '''
 
-    reply = update.message.reply_to_message.text
-
-    await update.message.reply_text(f"I read: {reply}")
+    await update.message.reply_text("Welcome! Glee says hi")
 
 # modifies the tag with usernames
 async def setup_tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -217,6 +217,7 @@ async def setup_tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     tag_name = tags[0]
     usernames = tags[1:]
 
+    db = Database(update.message.chat.id)
     db.setup_tag(tag_name, usernames)
     db.close_connection()
 
@@ -225,6 +226,7 @@ async def setup_tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # shows the current tags in the chat
 async def view_tags_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    db = Database(update.message.chat.id)
     tags = db.view_tags()
     db.close_connection()
 
@@ -241,6 +243,7 @@ async def view_tag_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if ('@' in processed_text):
         tags = extract_words_with_at_symbol(text)
 
+    db = Database(update.message.chat.id)
     for tag in tags:
         tag_usernames.extend(db.get_tag_usernames(tag))
     db.close_connection()
@@ -252,7 +255,8 @@ async def view_tag_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def view_database_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Connect to the database
-    connection = sqlite3.connect('username_data.db')
+    chat_id = update.message.chat.id
+    connection = sqlite3.connect(f'username_data_{chat_id}.db')
     cursor = connection.cursor()
 
     # Fetch the table names
@@ -343,6 +347,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         usernames = []
         tags = extract_words_with_at_symbol(text)
 
+        db = Database(update.message.chat.id)
         for tag in tags:
             usernames.extend(db.get_tag_usernames(tag))
         db.close_connection()
@@ -428,8 +433,6 @@ if __name__ == '__main__':
     app = Application.builder().token(TOKEN).build()
 
     # CREATES THE DATABASE
-    db = None
-    create_db_instance()
 
     # COMMANDS
     app.add_handler(CommandHandler('start', start_command))
