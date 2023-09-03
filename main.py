@@ -288,8 +288,11 @@ async def view_database_command(update: Update, context: ContextTypes.DEFAULT_TY
 # show count for tweet posts by paragraph
 async def count_char_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    if update.message.reply_to_message:
-        text: str = update.message.reply_to_message.text
+    if (update.message.reply_to_message):
+        if update.message.reply_to_message.text:
+            text: str = update.message.reply_to_message.text
+        else:
+            text: str = update.message.reply_to_message.caption
         reply: str = ""
 
         paragraphs = text.split("\n\n")
@@ -308,7 +311,10 @@ async def count_char_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     #check whether user is in group chat or private chat
     message_type: str = update.message.chat.type
-    text: str = update.message.text
+    if (update.message.text):
+        text: str = update.message.text
+    else:
+        text: str = update.message.caption
 
     print(f'User ({update.message.chat.id}) in {message_type}: "text"')
 
@@ -444,6 +450,7 @@ if __name__ == '__main__':
 
     #Messages
     app.add_handler(MessageHandler(filters.TEXT, handle_message))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_message))
     
     # ERRORS
     app.add_error_handler(error)
