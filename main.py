@@ -288,7 +288,7 @@ async def view_database_command(update: Update, context: ContextTypes.DEFAULT_TY
 # show count for tweet posts by paragraph
 async def count_char_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    if (update.message.reply_to_message):
+    if (update.message.reply_to_message.text) or (update.message.reply_to_message.caption):
         if update.message.reply_to_message.text:
             text: str = update.message.reply_to_message.text
         else:
