@@ -97,6 +97,18 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # modifies the tag with usernames
 async def setup_tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    # Get the chat ID and user ID
+    chat_id = update.message.chat.id
+    user_id = update.message.from_user.id
+
+    # Fetch the user's chat member information
+    chat_member = await context.bot.get_chat_member(chat_id, user_id)
+
+    # Check if the user is an administrator
+    if chat_member.status not in ("administrator", "creator"):
+        await update.message.reply_text("You must be a chat administrator to use this command.")
+        return
+
     text = update.message.text
     processed_text: str = text
 
@@ -161,7 +173,7 @@ async def view_database_command(update: Update, context: ContextTypes.DEFAULT_TY
     """)
 
 # show count for tweet posts by paragraph
-async def count_char_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def kasyaba_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if (update.message.reply_to_message.text) or (update.message.reply_to_message.caption):
         if update.message.reply_to_message.text:
@@ -300,7 +312,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('setuptag', setup_tag_command))
     app.add_handler(CommandHandler('viewtags', view_tags_command))
     app.add_handler(CommandHandler('viewdatabase', view_database_command))
-    app.add_handler(CommandHandler('countchar', count_char_command))
+    app.add_handler(CommandHandler('kasyaba', kasyaba_command))
 
     #Messages
     app.add_handler(MessageHandler(filters.TEXT, handle_message))
