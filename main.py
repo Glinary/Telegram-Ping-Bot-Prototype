@@ -54,7 +54,7 @@ class Database:
         self.chat_id = chat_id
 
     #modifies the tag usernames or deletes the tag if usernames is null
-    def setup_tag(self, tag_name, usernames):
+    def setup_tag(self, tag_name, usernames, chat_name):
         self.tags.delete_one({'chat_id': self.chat_id, 'tag_name': tag_name})
         
         if usernames:
@@ -62,6 +62,7 @@ class Database:
                 'chat_id': self.chat_id,
                 'tag_name': tag_name,
                 'tag_usernames': usernames,
+                'chat_username': chat_name
             })
 
     # returns the usernames connected in a tag
@@ -97,15 +98,16 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # modifies the tag with usernames
 async def setup_tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    # Get the chat ID and user ID
+    # Get the chat ID and user ID and chat name
     chat_id = update.message.chat.id
     user_id = update.message.from_user.id
+    chat_name = update.message.chat.title
 
     # Fetch the user's chat member information
     chat_member = await context.bot.get_chat_member(chat_id, user_id)
 
-    # Check if the user is an administrator
-    if chat_member.status not in ("administrator", "creator"):
+    # Check if the user is an administrator but disregard if it is not a group chat
+    if chat_member.status not in ("administrator", "creator") and update.message.chat.type == 'group':
         await update.message.reply_text("You must be a chat administrator to use this command.")
         return
 
@@ -119,7 +121,7 @@ async def setup_tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     usernames = tags[1:]
 
     db = Database(update.message.chat.id)
-    db.setup_tag(tag_name, usernames)
+    db.setup_tag(tag_name, usernames, chat_name)
     #db.close_connection()
 
     await update.message.reply_text("tags updated")
