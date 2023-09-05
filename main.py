@@ -1,9 +1,9 @@
-#TODO: make tag database different for each group chat
-
 # ---------- INSTALLATION REQUIREMENTS ---------- #
 '''
     pip install python-dotenv
     pip install python-telegram-bot
+    python -m pip install pymongo==3.6
+    pip3 install pymongo[srv]
 '''
 # ---------- INSTALLATION REQUIREMENTS ---------- #
 
@@ -191,6 +191,15 @@ async def kasyaba_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(reply)
 
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text: str = '''\
+    add a tag: "/setuptag @tag_name @username1 @username2"
+remove a tag: "/setuptag @tag_name"
+
+found a bug? contact web
+    '''
+    await update.message.reply_text(text)
+
 # ---------- CODE OF COMMANDS ---------- #
 
 # ---------- MESSAGE HANDLER ---------- #
@@ -313,6 +322,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('viewtags', view_tags_command))
     app.add_handler(CommandHandler('viewdatabase', view_database_command))
     app.add_handler(CommandHandler('kasyaba', kasyaba_command))
+    app.add_handler(CommandHandler('help', help_command))
 
     #Messages
     app.add_handler(MessageHandler(filters.TEXT, handle_message))
