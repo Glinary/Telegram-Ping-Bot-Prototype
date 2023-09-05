@@ -450,7 +450,12 @@ if __name__ == '__main__':
 
     #Messages
     app.add_handler(MessageHandler(filters.TEXT, handle_message))
+
+    #Photos
     app.add_handler(MessageHandler(filters.PHOTO, handle_message))
+
+    #Attachments
+    app.add_handler(MessageHandler(filters.ATTACHMENT, handle_message))
     
     # ERRORS
     app.add_error_handler(error)
