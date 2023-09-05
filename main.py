@@ -17,6 +17,7 @@ load_dotenv()
 # Load the hidden environment variables
 TOKEN: Final = os.getenv("TOKEN")
 BOT_USERNAME: Final = os.getenv("BOT_USERNAME")
+URI: Final = os.getenv("URI")
 
 
 # ---------- SECURE API TOKEN ---------- #
@@ -36,153 +37,52 @@ from telegram.error import BadRequest
 
 # ---------- DATABASE SETUP ---------- #
 
+from pymongo.mongo_client import MongoClient
 import sqlite3
 
 class Database:
-    
     # creates and connects the local database
     def __init__(self, chat_id):
+        self.client = MongoClient(URI)
+        try:
+            self.client.admin.command('ping')
+            print("Pinged your deployment. You successfully connected to MongoDB!")
+        except Exception as e:
+            print(e)
+        self.db = self.client.get_database('tags_db')
+        self.tags = self.db.tags
         self.chat_id = chat_id
-        self.connection = sqlite3.connect(f'username_data_{self.chat_id}.db')
-        self.cursor = self.connection.cursor()
 
-    # --- delete this section for mention ids feature --- #
-        self.cursor.execute("""
-        CREATE TABLE IF NOT EXISTS tag (
-            tag_name TEXT,
-            username TEXT
-        )
-        """)
-
-        self.cursor.execute("""
-        CREATE TABLE IF NOT EXISTS ids (
-            user_id TEXT PRIMARY KEY,
-            username TEXT
-        )
-        """)
-        self.connection.commit()
-
-    # --- delete this section for mention ids feature --- #
-
-
-    # uncomment for mention ids feature
-    '''
-        self.cursor.execute("""
-        CREATE TABLE IF NOT EXISTS tag (
-            tag_name TEXT,
-            username TEXT,
-            user_id TEXT
-        )
-        """)
-
-        self.cursor.execute("""
-        CREATE TABLE IF NOT EXISTS ids (
-            user_id TEXT PRIMARY KEY,
-            username TEXT
-        )
-        """)
-        self.connection.commit()
-    '''
-
-    # store user id
-    def store_user_id(self, user_id, username):
-        self.connection = sqlite3.connect(f'username_data_{self.chat_id}.db')
-        self.cursor = self.connection.cursor()
-        self.cursor.execute("""
-        DELETE FROM ids
-        WHERE username = '{}'
-        """.format(username))
-        self.connection.commit()
-
-        self.cursor.execute("""
-        INSERT INTO ids VALUES
-        ('{}', '{}')
-        """.format(user_id, '@' + username))
-        self.connection.commit()
-
-    # get user id given username
-    # IMPORTANT! get_user_id returns a list, so you may want to use index[0]
-    def get_user_id(self, username):
-        self.connection = sqlite3.connect(f'username_data_{self.chat_id}.db')
-        self.cursor = self.connection.cursor()
-        self.cursor.execute("""
-        SELECT user_id
-        FROM ids
-        WHERE username = '{}'
-        """.format(username))
-        temp = self.cursor.fetchone()
-        return temp
-
-    # returns connected ids in a tag
-    def get_tag_ids(self, tag_name):
-        self.connection = sqlite3.connect(f'username_data_{self.chat_id}.db')
-        self.cursor = self.connection.cursor()
-        self.cursor.execute("""
-        SELECT user_id
-        FROM tag
-        WHERE tag_name = '{}'
-        """.format(tag_name))
-        tag_ids = [row[0] for row in self.cursor.fetchall()]
-        return tag_ids
-
-    # modifies the tags with usernames but stores their id
-    # IMPORTANT! user must /start the bot first because it needs their id
+    #modifies the tag usernames or deletes the tag if usernames is null
     def setup_tag(self, tag_name, usernames):
-        self.connection = sqlite3.connect(f'username_data_{self.chat_id}.db')
-        self.cursor = self.connection.cursor()
-        self.cursor.execute("""
-        DELETE FROM tag
-        WHERE tag_name = '{}'
-        """.format(tag_name))
-        self.connection.commit()
-
-        # uncomment for mention ids feature
-        '''
-        for username in usernames:
-            temp = self.get_user_id(username)
-            user_id = temp[0]
-            self.cursor.execute("""
-            INSERT OR IGNORE INTO tag VALUES
-            ('{}', '{}', '{}')
-            """.format(tag_name, username, user_id))
-        self.connection.commit()
-        '''
-
-        # --- delete for mention ids feature --- #
-        for username in usernames:
-            self.cursor.execute("""
-            INSERT OR IGNORE INTO tag VALUES
-            ('{}', '{}')
-            """.format(tag_name, username))
-        self.connection.commit()
-        # --- delete for mention ids feature --- #
+        self.tags.delete_one({'chat_id': self.chat_id, 'tag_name': tag_name})
+        
+        if usernames:
+            self.tags.insert_one({
+                'chat_id': self.chat_id,
+                'tag_name': tag_name,
+                'tag_usernames': usernames,
+            })
 
     # returns the usernames connected in a tag
     def get_tag_usernames(self, tag_name):
-        self.connection = sqlite3.connect(f'username_data_{self.chat_id}.db')
-        self.cursor = self.connection.cursor()
-        self.cursor.execute("""
-        SELECT username 
-        FROM tag
-        WHERE tag_name = '{}'
-        """.format(tag_name))
-        tag_usernames = [row[0] for row in self.cursor.fetchall()]
+        print(tag_name)
+        temp_tags = self.tags.find_one({'tag_name': tag_name, 'chat_id': self.chat_id})
+        tag_usernames = temp_tags.get('tag_usernames')
         return tag_usernames
 
     # returns the database of tags in the chat
     def view_tags(self):
-        self.connection = sqlite3.connect(f'username_data_{self.chat_id}.db')
-        self.cursor = self.connection.cursor()
-        self.cursor.execute("""
-        SELECT DISTINCT tag_name
-        FROM tag
-        """)
-        tags = [row[0] for row in self.cursor.fetchall()]
-        return tags
+        cursor = self.tags.find({'chat_id': self.chat_id})
+        
+        # Collect tag names into a list
+        tag_names = [doc['tag_name'] for doc in cursor]
+        
+        return tag_names
 
     # closes the connection to the database
     def close_connection(self):
-        self.connection.close()
+        return "TODO"
          
 # ---------- DATABASE SETUP ---------- #
 
@@ -192,17 +92,6 @@ class Database:
 
 # starts the bot with a welcoming message
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    '''
-    user = update.effective_user
-    user_id = user.id
-    username = user.username
-
-    # Store the user ID and username in the database
-    db.store_user_id(user_id, username)
-    db.close_connection()
-    '''
-
     await update.message.reply_text("Welcome! Glee says hi")
 
 # modifies the tag with usernames
@@ -219,7 +108,7 @@ async def setup_tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     db = Database(update.message.chat.id)
     db.setup_tag(tag_name, usernames)
-    db.close_connection()
+    #db.close_connection()
 
     await update.message.reply_text("tags updated")
 
@@ -228,58 +117,44 @@ async def view_tags_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     db = Database(update.message.chat.id)
     tags = db.view_tags()
-    db.close_connection()
+    #db.close_connection()
 
     tags_text = ' '.join(tags)
     await update.message.reply_text(tags_text)
-
-# shows the usernames connected in a tag
-async def view_tag_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    text: str = update.message.text
-    processed_text: str = text
-    tag_usernames = []
-
-    if ('@' in processed_text):
-        tags = extract_words_with_at_symbol(text)
-
-    db = Database(update.message.chat.id)
-    for tag in tags:
-        tag_usernames.extend(db.get_tag_usernames(tag))
-    db.close_connection()
-
-    tag_usernames_processed = ' '.join(tag_usernames)
-    await update.message.reply_text(tag_usernames_processed)
 
 # shows database to users
 async def view_database_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Connect to the database
-    chat_id = update.message.chat.id
-    connection = sqlite3.connect(f'username_data_{chat_id}.db')
-    cursor = connection.cursor()
+    #chat_id = update.message.chat.id
+    client = MongoClient(URI)
+    try:
+        client.admin.command('ping')
+        print("Pinged your deployment. You successfully connected to MongoDB!")
+    except Exception as e:
+        print(e)
+    db = client.get_database('tags_db')
+    tags = db.tags
 
-    # Fetch the table names
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    tables = cursor.fetchall()
+    # Retrieve all documents from the 'tags' collection
+    all_documents = list(tags.find())
 
-    # Iterate over the tables
-    for table in tables:
-        table_name = table[0]
-        print(f"Table: {table_name}")
+    print("--- Database ---")
+    for document in all_documents:
+        print(f"Chat ID: {document['chat_id']}")
+        print(f"Tag Name: {document['tag_name']}")
+        
+        # Print tag usernames from the array
+        print("Tag Usernames:")
+        for username in document['tag_usernames']:
+            print(f"  {username}")
+        
+        print("-" * 20)  # Separator between documents
 
-        # Fetch the rows from the table
-        cursor.execute(f"SELECT * FROM {table_name}")
-        rows = cursor.fetchall()
-
-        # Print the rows
-        for row in rows:
-            print(row)
-
-        print()  # Add an empty line between tables
+    print("---")
 
     # Close the connection
-    connection.close()
+    #connection.close()
 
     await update.message.reply_text("""
     Database printed successfully. Note that only devs have access to the console.
@@ -329,26 +204,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
     '''
 
-    # uncomment for mention ids feature
-    '''
-    if ("@" in text):
-        user_ids = []
-        tags = extract_words_with_at_symbol(text)
-
-        for tag in tags:
-            user_ids.extend(db.get_tag_ids(tag))
-        db.close_connection()
-
-        # Generate mention tags for each user ID
-        mention_tags = [f'<a href="tg://user?id={user_id}">.</a>' for user_id in user_ids]
-        mention_message = ''.join(mention_tags)
-        await update.effective_chat.send_message(
-            text = mention_message,
-            parse_mode = ParseMode.HTML
-        )
-    '''
-    # --- delete for mention ids feature --- #
-
     if ("@" in text):
         usernames = []
         tags = extract_words_with_at_symbol(text)
@@ -356,7 +211,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db = Database(update.message.chat.id)
         for tag in tags:
             usernames.extend(db.get_tag_usernames(tag))
-        db.close_connection()
+        #db.close_connection()
 
         usernames_processed = ' '.join(usernames)
 
@@ -444,7 +299,6 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('setuptag', setup_tag_command))
     app.add_handler(CommandHandler('viewtags', view_tags_command))
-    app.add_handler(CommandHandler('viewtagusernames', view_tag_usernames))
     app.add_handler(CommandHandler('viewdatabase', view_database_command))
     app.add_handler(CommandHandler('countchar', count_char_command))
 
