@@ -5,6 +5,8 @@ The LaSallian. While the actual deployed bot is stored in the
 [organization's repository](https://github.com/thelasallian/PingBot-OpenSource), this version is the prototype of any
 future updates that will be implemented in the bot. 
 
+# Installation
+
 1. Connect using SSH to the VM `ssh -i \path\to\private_key host_name@public_ip`
 1. Install the following dependencies. Note that PyMongo 3.6 uses an unstable API and must be updated should there be an issue.
 ``` 
