@@ -2,7 +2,7 @@
 '''
     pip install python-dotenv
     pip install python-telegram-bot
-    python -m pip install pymongo==3.6
+    python -m pip install pymongo==3.8
     pip3 install pymongo[srv]
 '''
 # ---------- INSTALLATION REQUIREMENTS ---------- #
@@ -18,7 +18,6 @@ load_dotenv()
 TOKEN: Final = os.getenv("TOKEN")
 BOT_USERNAME: Final = os.getenv("BOT_USERNAME")
 URI: Final = os.getenv("URI")
-
 
 # ---------- SECURE API TOKEN ---------- #
 
@@ -124,7 +123,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db = Database(update.message.chat.id)
     db.store_userdata(user_id, username)
 
-    await update.message.reply_text(f"id = {user_id}, username: {username}")
+    await update.message.reply_text("Welcome! Please note that you will have to message this bot again using the same /start command should you choose to change your username in the future. Thank you! -Glee")
 
 # modifies the tag with usernames
 async def setup_tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -259,6 +258,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     '''
 
     if ("@" in text):
+
         usernames = []
         ids = []
         tags = extract_words_with_at_symbol(text)
@@ -270,28 +270,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         ids.extend(db.get_ids_from_usernames(usernames))
 
-        print("---")
-        print(ids)
-        print("")
-         # Generate mention tags for each user ID
-        mention_tags = [f'<a href="tg://user?id={id}">-</a>' for id in ids]
-        mention_message = ''.join(mention_tags)
-        tags_string = ' '.join(tags)
-        await update.message.reply_text(
-            text = f"🔔mentioned {tags_string} " + mention_message,
-            parse_mode = ParseMode.HTML
-        )
+        if ids:
+            print("")
+            # Generate mention tags for each user ID
+            mention_tags = [f'<a href="tg://user?id={id}">-</a>' for id in ids]
+            mention_message = ''.join(mention_tags)
+            tags_string = ' '.join(tags)
+
+            await update.message.reply_text(
+                text = f"🔔mentioned {tags_string} " + mention_message,
+                parse_mode = ParseMode.HTML
+            )
 
         #usernames_processed = ' '.join(usernames)
-
         #user_ids = get_user_ids(usernames, update.message.chat.id)
-
         #await update.message.reply_text("test")
-
-
-    # --- delete for mention ids feature --- #
         
-
 # ---------- MESSAGE HANDLER ---------- #
 
 # ---------- DEBUGGER ---------- #
