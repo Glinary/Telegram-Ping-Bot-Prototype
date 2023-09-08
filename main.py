@@ -18,6 +18,7 @@ load_dotenv()
 TOKEN: Final = os.getenv("TOKEN")
 BOT_USERNAME: Final = os.getenv("BOT_USERNAME")
 URI: Final = os.getenv("URI")
+PASSWORD: Final = os.getenv("PASSWORD")
 
 # ---------- SECURE API TOKEN ---------- #
 
@@ -53,6 +54,7 @@ class Database:
         self.chat_id = chat_id
 
         self.userdata = self.db.userdata
+        self.allowedchats = self.db.allowedchats
 
     #modifies the tag usernames or deletes the tag if usernames is null
     def setup_tag(self, tag_name, usernames, chat_name):
@@ -103,7 +105,25 @@ class Database:
             # Insert a new document
             self.userdata.insert_one({'user_id': user_id, 'username': "@"+username})
 
-        
+    def authenticate(self, chat_name):
+        temp = self.allowedchats.find_one({'chat_id': self.chat_id})
+        if temp:
+            print("You already signed up")
+        else:
+            self.allowedchats.insert_one({
+                'chat_id': self.chat_id,
+                'chat_username': chat_name
+            })
+
+    def should_disable_bot(self):
+        temp = self.allowedchats.find_one({'chat_id': self.chat_id})
+        if temp:
+            print("I found your chat id")
+            return True
+        else:
+            print("I didnt find your chat id")
+            return False
+
     # closes the connection to the database
     def close_connection(self):
         return "TODO"
@@ -117,16 +137,44 @@ class Database:
 # starts the bot with a welcoming message
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
+    # --- AUTHENTICATOR --- #
+    #check whether user is in group chat or private chat
+    message_type: str = update.message.chat.type
+    if (message_type == 'group' or message_type == 'supergroup'):
+        db = Database(update.message.chat_id)
+        if db.should_disable_bot() == False:
+            await update.message.reply_text("You are not authorized to use this bot.")
+            return
+    # --- AUTHENTICATOR --- #
+
     username = update.message.from_user.username
     user_id = update.message.from_user.id
 
     db = Database(update.message.chat.id)
     db.store_userdata(user_id, username)
 
-    await update.message.reply_text("Welcome! Please note that you will have to message this bot again using the same /start command should you choose to change your username in the future. Thank you! -Glee")
+    await update.message.reply_text('''\
+Welcome!
+
+Please note that you will have to message this bot again using the same /start command should you choose to change your username in the future.
+
+Thank you! 
+
+- Glee
+''')
 
 # modifies the tag with usernames
 async def setup_tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    # --- AUTHENTICATOR --- #
+    #check whether user is in group chat or private chat
+    message_type: str = update.message.chat.type
+    if (message_type == 'group' or message_type == 'supergroup' or message_type == 'private'):
+        db = Database(update.message.chat_id)
+        if db.should_disable_bot() == False:
+            await update.message.reply_text("You are not authorized to use this bot.")
+            return
+    # --- AUTHENTICATOR --- #
 
     # Get the chat ID and user ID and chat name
     chat_id = update.message.chat.id
@@ -158,6 +206,16 @@ async def setup_tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # shows the current tags in the chat
 async def view_tags_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    # --- AUTHENTICATOR --- #
+    #check whether user is in group chat or private chat
+    message_type: str = update.message.chat.type
+    if (message_type == 'group' or message_type == 'supergroup' or message_type == 'private'):
+        db = Database(update.message.chat_id)
+        if db.should_disable_bot() == False:
+            await update.message.reply_text("You are not authorized to use this bot.")
+            return
+    # --- AUTHENTICATOR --- #
 
     db = Database(update.message.chat.id)
     tags = db.view_tags()
@@ -204,8 +262,31 @@ async def view_database_command(update: Update, context: ContextTypes.DEFAULT_TY
     Database printed successfully. Note that only devs have access to the console.
     """)
 
+async def authenticate_command(update:Update, context: ContextTypes.DEFAULT_TYPE):
+    #show inline query
+    #make sure only admin 
+    text = update.message.text
+    if text == "/authenticate " + PASSWORD:
+        db = Database(update.message.chat_id)
+        db.authenticate(update.message.chat.title)
+        reply = "Password accepted"
+    else:
+        reply = "Try again"
+
+    await update.message.reply_text(reply)
+
 # show count for tweet posts by paragraph
 async def kasyaba_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    # --- AUTHENTICATOR --- #
+    #check whether user is in group chat or private chat
+    message_type: str = update.message.chat.type
+    if (message_type == 'group' or message_type == 'supergroup' or message_type == 'private'):
+        db = Database(update.message.chat_id)
+        if db.should_disable_bot() == False:
+            await update.message.reply_text("You are not authorized to use this bot.")
+            return
+    # --- AUTHENTICATOR --- #
 
     if (update.message.reply_to_message.text) or (update.message.reply_to_message.caption):
         if update.message.reply_to_message.text:
@@ -219,16 +300,31 @@ async def kasyaba_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for i in range(0, len(paragraphs), 1):
             reply += get_count(paragraphs[i], i+1) + " \n"
     else:
-        reply = "bhie wala namang tweet"
+        reply = "beh i-reply mo sa tweet"
     
     await update.message.reply_text(reply)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text: str = '''\
-    add a tag: "/setuptag @tag_name @username1 @username2"
-remove a tag: "/setuptag @tag_name"
 
-found a bug? contact web
+    # --- AUTHENTICATOR --- #
+    #check whether user is in group chat or private chat
+    message_type: str = update.message.chat.type
+    if (message_type == 'group' or message_type == 'supergroup'):
+        db = Database(update.message.chat_id)
+        if db.should_disable_bot() == False:
+            await update.message.reply_text("You are not authorized to use this bot.")
+            return
+    # --- AUTHENTICATOR --- #
+
+    text: str = '''\
+    To add a new tag, use the /setuptag command.
+/setuptag @<name of tag> @<users>
+
+To edit a tag, you will have to repeat the instructions above.
+
+To delete a tag, enter the following: /setuptag @<tag name>
+
+Note that the user must be an admin to be able to use these commands.
     '''
     await update.message.reply_text(text)
 
@@ -237,8 +333,17 @@ found a bug? contact web
 # ---------- MESSAGE HANDLER ---------- #
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    # --- AUTHENTICATOR --- #
     #check whether user is in group chat or private chat
     message_type: str = update.message.chat.type
+    if (message_type == 'group' or message_type == 'supergroup'):
+        db = Database(update.message.chat_id)
+        if db.should_disable_bot() == False:
+            await update.message.reply_text("You are not authorized to use this bot.")
+            return
+    # --- AUTHENTICATOR --- #
+
     if (update.message.text):
         text: str = update.message.text
     else:
@@ -278,7 +383,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             tags_string = ' '.join(tags)
 
             await update.message.reply_text(
-                text = f"🔔mentioned {tags_string} " + mention_message,
+                text = f"🔔 Mentioned {tags_string} " + mention_message,
                 parse_mode = ParseMode.HTML
             )
 
@@ -359,13 +464,14 @@ if __name__ == '__main__':
     # CREATES THE DATABASE
 
     # COMMANDS
+    app.add_handler(CommandHandler('authenticate', authenticate_command))
     app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('setuptag', setup_tag_command))
     app.add_handler(CommandHandler('viewtags', view_tags_command))
     app.add_handler(CommandHandler('viewdatabase', view_database_command))
     app.add_handler(CommandHandler('kasyaba', kasyaba_command))
     app.add_handler(CommandHandler('help', help_command))
-
+    
     #Messages
     app.add_handler(MessageHandler(filters.TEXT, handle_message))
 
