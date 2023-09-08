@@ -53,6 +53,8 @@ class Database:
         self.tags = self.db.tags
         self.chat_id = chat_id
 
+        self.userdata = self.db.userdata
+
     #modifies the tag usernames or deletes the tag if usernames is null
     def setup_tag(self, tag_name, usernames, chat_name):
         self.tags.delete_one({'chat_id': self.chat_id, 'tag_name': tag_name})
@@ -67,10 +69,21 @@ class Database:
 
     # returns the usernames connected in a tag
     def get_tag_usernames(self, tag_name):
-        print(tag_name)
         temp_tags = self.tags.find_one({'tag_name': tag_name, 'chat_id': self.chat_id})
         tag_usernames = temp_tags.get('tag_usernames')
         return tag_usernames
+    
+    #TODO: ids should return an array of id
+    def get_ids_from_usernames(self, usernames):
+        ids = []
+
+        for username in usernames:
+            cursor = self.userdata.find({'username': username})
+
+            for doc in cursor:
+                ids.append(doc['user_id'])
+
+        return ids
 
     # returns the database of tags in the chat
     def view_tags(self):
@@ -80,7 +93,18 @@ class Database:
         tag_names = [doc['tag_name'] for doc in cursor]
         
         return tag_names
+    
+    def store_userdata(self, user_id, username):
+        temp = self.userdata.find_one({'user_id': user_id})
 
+        if temp:
+            # Use update_one with the filter and update document
+            self.userdata.update_one({'user_id': user_id}, {'$set': {'username': "@"+username}})
+        else:
+            # Insert a new document
+            self.userdata.insert_one({'user_id': user_id, 'username': "@"+username})
+
+        
     # closes the connection to the database
     def close_connection(self):
         return "TODO"
@@ -93,7 +117,14 @@ class Database:
 
 # starts the bot with a welcoming message
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Welcome! Glee says hi")
+
+    username = update.message.from_user.username
+    user_id = update.message.from_user.id
+
+    db = Database(update.message.chat.id)
+    db.store_userdata(user_id, username)
+
+    await update.message.reply_text(f"id = {user_id}, username: {username}")
 
 # modifies the tag with usernames
 async def setup_tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -229,6 +260,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if ("@" in text):
         usernames = []
+        ids = []
         tags = extract_words_with_at_symbol(text)
 
         db = Database(update.message.chat.id)
@@ -236,11 +268,25 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             usernames.extend(db.get_tag_usernames(tag))
         #db.close_connection()
 
-        usernames_processed = ' '.join(usernames)
+        ids.extend(db.get_ids_from_usernames(usernames))
+
+        print("---")
+        print(ids)
+        print("")
+         # Generate mention tags for each user ID
+        mention_tags = [f'<a href="tg://user?id={id}">-</a>' for id in ids]
+        mention_message = ''.join(mention_tags)
+        tags_string = ' '.join(tags)
+        await update.message.reply_text(
+            text = f"🔔mentioned {tags_string} " + mention_message,
+            parse_mode = ParseMode.HTML
+        )
+
+        #usernames_processed = ' '.join(usernames)
 
         #user_ids = get_user_ids(usernames, update.message.chat.id)
 
-        await update.message.reply_text(usernames_processed)
+        #await update.message.reply_text("test")
 
 
     # --- delete for mention ids feature --- #
