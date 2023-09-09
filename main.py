@@ -30,15 +30,11 @@ from telegram.constants import ParseMode
 
 import re
 
-from telegram import Bot
-from telegram.error import BadRequest
-
 # ---------- IMPORT TELEGRAM API ---------- #
 
 # ---------- DATABASE SETUP ---------- #
 
 from pymongo.mongo_client import MongoClient
-import sqlite3
 
 class Database:
     # creates and connects the local database
@@ -51,22 +47,30 @@ class Database:
             print(e)
         self.db = self.client.get_database('tags_db')
         self.tags = self.db.tags
-        self.chat_id = chat_id
-
         self.userdata = self.db.userdata
         self.allowedchats = self.db.allowedchats
+        self.chat_id = chat_id
 
     #modifies the tag usernames or deletes the tag if usernames is null
     def setup_tag(self, tag_name, usernames, chat_name):
         self.tags.delete_one({'chat_id': self.chat_id, 'tag_name': tag_name})
+
+        #get ids based on tags
+        tag_ids = self.get_ids_from_usernames(usernames)
         
         if usernames:
             self.tags.insert_one({
                 'chat_id': self.chat_id,
                 'tag_name': tag_name,
-                'tag_usernames': usernames,
+                'tag_ids': tag_ids,
                 'chat_username': chat_name
             })
+
+    def get_tag_ids(self, tag_name):
+        temp_tags = self.tags.find_one({'tag_name': tag_name, 'chat_id': self.chat_id})
+        tag_ids = temp_tags.get('tag_ids')
+
+        return tag_ids
 
     # returns the usernames connected in a tag
     def get_tag_usernames(self, tag_name):
@@ -85,6 +89,17 @@ class Database:
                 ids.append(doc['user_id'])
 
         return ids
+    
+    def get_usernames_from_ids(self, ids):
+        usernames = []
+
+        for user_id in ids:
+            cursor = self.userdata.find({'user_id': user_id})
+
+            for doc in cursor:
+                usernames.append(doc['username'])
+
+        return usernames
 
     # returns the database of tags in the chat
     def view_tags(self):
@@ -199,11 +214,22 @@ async def setup_tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     usernames = tags[1:]
 
     db = Database(update.message.chat.id)
+    missing_usernames = []  # To store usernames not found in the database
+
+    for username in usernames:
+        count = db.userdata.count_documents({'username': username})
+
+        if count == 0:
+            missing_usernames.append(username)
+
     db.setup_tag(tag_name, usernames, chat_name)
-    #db.close_connection()
 
-    await update.message.reply_text("tags updated")
-
+    if missing_usernames:
+        missing_usernames_str = ", ".join(missing_usernames)
+        await update.message.reply_text(f"The following usernames were not found in the database: {missing_usernames_str}")
+    else:
+        await update.message.reply_text("Tags updated successfully")
+    
 # shows the current tags in the chat
 async def view_tags_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
@@ -223,6 +249,25 @@ async def view_tags_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     tags_text = ' '.join(tags)
     await update.message.reply_text(tags_text)
+
+async def view_tag_ids_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    text: str = update.message.text
+    processed_text: str = text.lower()
+    tag_ids = []
+    usernames = []
+
+    if ('@' in processed_text):
+      tags = extract_words_with_at_symbol(processed_text)
+
+      db = Database(update.message.chat.id)
+      for tag in tags:
+          tag_ids.extend(db.get_tag_ids(tag))
+
+    usernames = db.get_usernames_from_ids(tag_ids)
+    usernames_processed = ' '.join(usernames)
+    usernames_processed_no_mention = usernames_processed.replace('@', '')
+    await update.message.reply_text(usernames_processed_no_mention)
 
 # shows database to users
 async def view_database_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -370,10 +415,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         db = Database(update.message.chat.id)
         for tag in tags:
-            usernames.extend(db.get_tag_usernames(tag))
+            ids.extend(db.get_tag_ids(tag))
         #db.close_connection()
 
-        ids.extend(db.get_ids_from_usernames(usernames))
+        #ids.extend(db.get_ids_from_usernames(usernames))
 
         if ids:
             print("")
@@ -439,23 +484,6 @@ def get_count(text, num) -> str:
 
     return reply
 
-# TODO: Bot object has no attribute get_chat_members
-def get_user_ids(usernames, chat_id):
-    bot = Bot(token = TOKEN)
-    user_ids = []
-
-    for username in usernames:
-        try:
-            members = bot.get_chat_members(chat_id=chat_id)
-            for member in members:
-                if member.user.username == username:
-                    user_ids.append(member.user.id)
-                    break
-        except BadRequest as e:
-            print(f"Failed to get members: {str(e)}")
-
-    return user_ids
-
 # ---------- ASSISTING FUNCTIONS IN CODE OF COMMANDS ---------- #
 
 if __name__ == '__main__':
@@ -468,6 +496,7 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler('start', start_command))
     app.add_handler(CommandHandler('setuptag', setup_tag_command))
     app.add_handler(CommandHandler('viewtags', view_tags_command))
+    app.add_handler(CommandHandler('viewtagids', view_tag_ids_command))
     app.add_handler(CommandHandler('viewdatabase', view_database_command))
     app.add_handler(CommandHandler('kasyaba', kasyaba_command))
     app.add_handler(CommandHandler('help', help_command))
