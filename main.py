@@ -2,7 +2,7 @@
 '''
     pip install python-dotenv
     pip install python-telegram-bot
-    python -m pip install pymongo==3.8
+    python -m pip install pymongo==3.11
     pip3 install pymongo[srv]
 '''
 # ---------- INSTALLATION REQUIREMENTS ---------- #
