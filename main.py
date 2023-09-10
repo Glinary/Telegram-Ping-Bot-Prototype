@@ -201,7 +201,7 @@ async def setup_tag_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_member = await context.bot.get_chat_member(chat_id, user_id)
 
     # Check if the user is an administrator but disregard if it is not a group chat
-    if chat_member.status not in ("administrator", "creator") and update.message.chat.type == 'group':
+    if chat_member.status not in ("administrator", "creator") and (update.message.chat.type == 'group' or update.message.chat.type == 'supergroup'):
         await update.message.reply_text("You must be a chat administrator to use this command.")
         return
 
