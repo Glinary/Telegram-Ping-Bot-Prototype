@@ -68,9 +68,13 @@ class Database:
 
     def get_tag_ids(self, tag_name):
         temp_tags = self.tags.find_one({'tag_name': tag_name, 'chat_id': self.chat_id})
-        tag_ids = temp_tags.get('tag_ids')
 
-        return tag_ids
+        # avoid an error if tag_name does not exist in db
+        if (temp_tags):
+            tag_ids = temp_tags.get('tag_ids') 
+            return tag_ids
+        else:
+            return None
 
     # returns the usernames connected in a tag
     def get_tag_usernames(self, tag_name):
@@ -337,9 +341,12 @@ async def kasyaba_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if (update.message.reply_to_message.text) or (update.message.reply_to_message.caption):
         if update.message.reply_to_message.text:
             text: str = update.message.reply_to_message.text
-        else:
+            reply: str = ""
+        elif (update.message.reply_to_message.caption):
             text: str = update.message.reply_to_message.caption
-        reply: str = ""
+            reply: str = ""
+        else: 
+            reply: str = "beh i-reply mo sa tweet"
 
         paragraphs = text.split("\n\n")
 
@@ -413,9 +420,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         usernames = []
         ids = []
         tags = extract_words_with_at_symbol(text)
+        # filter out invalid tags that return None
+        valid_tags = [tag for tag in tags if db.get_tag_ids(tag) is not None]
 
         db = Database(update.message.chat.id)
-        for tag in tags:
+        for tag in valid_tags:
             ids.extend(db.get_tag_ids(tag))
         #db.close_connection()
 
@@ -426,7 +435,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Generate mention tags for each user ID
             mention_tags = [f'<a href="tg://user?id={id}">-</a>' for id in ids]
             mention_message = ''.join(mention_tags)
-            tags_string = ' '.join(tags)
+            tags_string = ' '.join(valid_tags)
 
             await update.message.reply_text(
                 text = f"🔔 Mentioned {tags_string} " + mention_message,
@@ -464,7 +473,8 @@ def extract_words_with_at_symbol(text):
 def get_count(text, num) -> str:
     text_len = len(text)
 
-    link_pattern = r'\b((?:https?://)?(?:(?:www\.)?(?:[\da-z\.-]+)\.(?:[a-z]{2,6})|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|(?:(?:[0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:(?:(?::[0-9a-fA-F]{1,4}){1,6})|:(?:(?::[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(?::[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(?:ffff(?::0{1,4}){0,1}:){0,1}(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])|(?:[0-9a-fA-F]{1,4}:){1,4}:(?:(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(?:25[0-5]|(?:2[0-4]|1{0,1}[0-9]){0,1}[0-9])))(?::[0-9]{1,4}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])?(?:/[\w\.-]*)*/?)\b'
+    #SAVE THIS LINK \b((?:https?://)?(?:www\.[\da-z\.-]+\.[a-z]{2,6}|[\da-z\.-]+(?:\.[a-z]{2,6})+)(?:/[\w\.-]*)*/?)\b
+    link_pattern = r'\b((?:https?://)?(?:www\.[\da-z\.-]+\.[a-z]{2,6}|[\da-z\.-]+(?:\.[a-z]{2,6})+)(?:/[\w\.-]*)*/?)\b'
 
     # Replace links with a fixed-length placeholder
     def replace_links(match):
