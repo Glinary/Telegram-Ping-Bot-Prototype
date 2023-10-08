@@ -16,9 +16,10 @@ load_dotenv()
 
 # Load the hidden environment variables
 TOKEN: Final = os.getenv("TOKEN")
-BOT_USERNAME: Final = os.getenv("BOT_USERNAME")
-URI: Final = os.getenv("URI")
+BOT_USERNAME: Final = os.getenv("BOT_USERNAME") 
+URI: Final = os.getenv("URI")    
 PASSWORD: Final = os.getenv("PASSWORD")
+
 
 # ---------- SECURE API TOKEN ---------- #
 
@@ -127,6 +128,11 @@ class Database:
     def authenticate(self, chat_name):
         temp = self.allowedchats.find_one({'chat_id': self.chat_id})
         if temp:
+            #check if a tag exists in the current chat id
+            temp2 = self.tags.find_one({'chat_username': chat_name})
+            if (temp2):
+                # update chat id using chat name as identifier
+                self.tags.update_many({'chat_username': chat_name}, {'$set': {'chat_id': self.chat_id}})
             print("You already signed up")
         else:
             self.allowedchats.insert_one({
