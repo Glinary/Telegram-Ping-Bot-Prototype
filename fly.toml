@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for tlsbot on 2023-09-10T21:19:11+08:00
+# fly.toml app configuration file generated for pingloibot on 2023-11-07T20:16:50+08:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = "tlsbot"
+app = "pingloibot"
 primary_region = "sin"
 
 [build]

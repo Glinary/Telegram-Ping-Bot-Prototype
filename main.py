@@ -344,7 +344,7 @@ async def kasyaba_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
     # --- AUTHENTICATOR --- #
 
-    if (update.message.reply_to_message.text) or (update.message.reply_to_message.caption):
+    if update.message.reply_to_message and (update.message.reply_to_message.text or update.message.reply_to_message.caption):
         if update.message.reply_to_message.text:
             text: str = update.message.reply_to_message.text
             reply: str = ""
